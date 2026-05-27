@@ -2,10 +2,10 @@ package com.github.senocak
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
-import jakarta.persistence.EntityManager
 import jakarta.persistence.GeneratedValue
+import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
-import jakarta.persistence.PersistenceContext
+import jakarta.persistence.SequenceGenerator
 import jakarta.persistence.Table
 import oracle.ucp.jdbc.PoolDataSource
 import oracle.ucp.jdbc.PoolDataSourceFactory
@@ -25,7 +25,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 import org.springframework.context.event.EventListener
-import org.springframework.data.jpa.repository.support.SimpleJpaRepository
+import org.springframework.data.repository.CrudRepository
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
@@ -78,14 +78,15 @@ class OracleConfiguration {
 @ConfigurationPropertiesScan
 @SpringBootApplication
 class SpringKotlinApplication(
-    @PersistenceContext private val entityManager: EntityManager,
-): SimpleJpaRepository<User, Long>(User::class.java, entityManager) {
-    @Transactional
+    private val userRepository: UserRepository,
+    private val roleRepository: RoleRepository,
+) {
+    //@Transactional
     @EventListener(value = [ApplicationReadyEvent::class])
     fun applicationReadyEvent() {
         var current = 1
-        val total = 52
-        val chunkSize = 25 // choose per-run chunking
+        val total = 12
+        val chunkSize = 5 // choose per-run chunking
         var remaining: Int = total
         while (remaining > 0) {
             val currentBatch: Int = minOf(a = remaining, b = chunkSize)
@@ -98,19 +99,23 @@ class SpringKotlinApplication(
                     current++
                 }
                 // If you're using SimpleJpaRepository.saveAll(this) call it here:
-                saveAll(users) // or persist each with entityManager.persist(user)
-                // Flush/clear to control first-level cache growth if necessary
-                entityManager.flush()
-                entityManager.clear()
+                userRepository.saveAll(users) // or persist each with entityManager.persist(user)
             } finally {
                 // Important: clear thread-local to avoid leaking the batch size to later operations
                 IdGenerationContext.clear()
             }
             remaining -= currentBatch
         }
+        roleRepository.saveAll(mutableListOf<Role>()
+            .also {
+                repeat(times = 7) { i: Int ->
+                    it.add(element = Role(name = "John $i"))
+                }
+            })
     }
 
-    @GetMapping(value = ["/findAll"]) fun getAll(): List<User> = findAll()
+    @GetMapping(value = ["/users/findAll"]) fun getAllUsers(): Iterable<User> = userRepository.findAll()
+    @GetMapping(value = ["/roles/findAll"]) fun getAllRoles(): Iterable<Role> = roleRepository.findAll()
 }
 
 @Entity
@@ -125,6 +130,21 @@ class User(
     //@IdGeneratorType(value = DynamicSequenceGenerator::class)
     var id: Long? = null
 }
+interface UserRepository: CrudRepository<User, Long>
+
+@Entity
+@Table(name = "users")
+class Role(
+    @Column(name = "name", nullable = false, length = 50) var name: String? = null,
+) {
+    @Id
+    @Column(name = "id", updatable = false, nullable = false)
+    //@IdGeneratorType(value = DynamicSequenceGenerator::class)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "SEQ_USER_GENERATOR")
+    @SequenceGenerator(name = "SEQ_USER_GENERATOR", sequenceName = "users_seq", allocationSize = 1)
+    var id: Long? = null
+}
+interface RoleRepository: CrudRepository<Role, Long>
 
 object IdGenerationContext {
     private val BATCH_SIZE: ThreadLocal<Int> = ThreadLocal<Int>().also { it: ThreadLocal<Int> ->

@@ -23,6 +23,15 @@ spring:
     database-platform: org.hibernate.dialect.OracleDialect
     hibernate:
       ddl-auto: create-drop
+    properties:
+      hibernate:
+        show_sql: false
+        order_updates: true
+        order_inserts: true
+        jdbc:
+          batch_size: 10
+          fetch_size: 10
+    show-sql: false
   threads:
     virtual:
       enabled: true

@@ -1,0 +1,7 @@
+@baseUrl = http://localhost:8083/v1
+
+### find all users
+GET {{baseUrl}}/users/findAll
+
+### find all roles
+GET {{baseUrl}}/roles/findAll
