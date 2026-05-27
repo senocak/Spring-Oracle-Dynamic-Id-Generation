@@ -133,7 +133,7 @@ class User(
 interface UserRepository: CrudRepository<User, Long>
 
 @Entity
-@Table(name = "users")
+@Table(name = "roles")
 class Role(
     @Column(name = "name", nullable = false, length = 50) var name: String? = null,
 ) {
