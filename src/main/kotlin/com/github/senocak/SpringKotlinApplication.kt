@@ -26,7 +26,6 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 import org.springframework.context.event.EventListener
 import org.springframework.data.repository.CrudRepository
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -81,7 +80,6 @@ class SpringKotlinApplication(
     private val userRepository: UserRepository,
     private val roleRepository: RoleRepository,
 ) {
-    //@Transactional
     @EventListener(value = [ApplicationReadyEvent::class])
     fun applicationReadyEvent() {
         var current = 1
@@ -98,8 +96,7 @@ class SpringKotlinApplication(
                     users.add(element = User(name = "John $current $i"))
                     current++
                 }
-                // If you're using SimpleJpaRepository.saveAll(this) call it here:
-                userRepository.saveAll(users) // or persist each with entityManager.persist(user)
+                userRepository.saveAll(users)
             } finally {
                 // Important: clear thread-local to avoid leaking the batch size to later operations
                 IdGenerationContext.clear()
@@ -107,8 +104,8 @@ class SpringKotlinApplication(
             remaining -= currentBatch
         }
         roleRepository.saveAll(mutableListOf<Role>()
-            .also {
-                repeat(times = 7) { i: Int ->
+            .also { it: MutableList<Role> ->
+                repeat(times = 12) { i: Int ->
                     it.add(element = Role(name = "John $i"))
                 }
             })
