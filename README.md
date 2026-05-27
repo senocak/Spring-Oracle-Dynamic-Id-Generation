@@ -66,6 +66,7 @@ Examples:
 |---|---|
 | `@Table(name = "users")` | `users_seq` |
 | `Invoice` | `invoice_seq` |
+
 This means the sequence naming rule is defined once in the generator rather than repeated across all entities.
 
 ---
