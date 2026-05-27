@@ -1,0 +1,13 @@
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+.idea
+.vscode
+.kotlin
+**/var/logs/
+**/.DS_STORE
+**/node_modules
+.gradle/
+**/.gradle/
+logs

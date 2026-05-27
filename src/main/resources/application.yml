@@ -1,0 +1,45 @@
+server:
+  port: ${SERVER_PORT:8083}
+
+spring:
+  application:
+    name: SpringKotlinOracle
+  datasource:
+    url: ${ORACLE_URL:jdbc:oracle:thin:@//localhost:1522/FREEPDB1}
+    username: ${ORACLE_USERNAME:system}
+    password: ${ORACLE_PASSWORD:testpassword}
+    ddl: ${spring.jpa.hibernate.ddl-auto}
+    ucp:
+      connection-factory-class-name: oracle.jdbc.pool.OracleDataSource
+      #connection-factory-class-name: oracle.jdbc.replay.OracleDataSourceImpl # If you are using Replay datasource
+      sql-for-validate-connection: select * from dual
+      connection-pool-name: SpringKotlinOracleConnectionPoolName1
+      initial-pool-size: 15
+      min-pool-size: 10
+      max-pool-size: 30
+      validate-connection-on-borrow: true
+      seconds-to-trust-idle-connection: 1
+  jpa:
+    database-platform: org.hibernate.dialect.OracleDialect
+    hibernate:
+      ddl-auto: create-drop
+  threads:
+    virtual:
+      enabled: true
+
+logging:
+  level:
+    net:
+      ttddyy:
+        dsproxy:
+          listener: debug
+  file:
+    name: ./logs/app.log
+
+decorator:
+  datasource:
+    datasource-proxy:
+      query:
+        enable-logging: true # Enable query logging
+        log-level: debug # Set the logging level for queries (DEBUG, INFO, etc.)
+      logging: slf4j # Specify the logging library (e.g., slf4j, jul, common, sysout)
