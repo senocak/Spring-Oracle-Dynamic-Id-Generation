@@ -38,6 +38,7 @@ spring:
 
 logging:
   level:
+    org.hibernate: info
     net:
       ttddyy:
         dsproxy:
@@ -50,5 +51,5 @@ decorator:
     datasource-proxy:
       query:
         enable-logging: true # Enable query logging
-        log-level: debug # Set the logging level for queries (DEBUG, INFO, etc.)
+        log-level: info # Set the logging level for queries (DEBUG, INFO, etc.)
       logging: slf4j # Specify the logging library (e.g., slf4j, jul, common, sysout)

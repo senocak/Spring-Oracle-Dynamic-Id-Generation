@@ -7,28 +7,24 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.SequenceGenerator
 import jakarta.persistence.Table
-import oracle.ucp.jdbc.PoolDataSource
-import oracle.ucp.jdbc.PoolDataSourceFactory
-import oracle.ucp.jdbc.PoolDataSourceImpl
+import org.apache.catalina.Context
+import org.apache.catalina.startup.Tomcat
 import org.hibernate.annotations.GenericGenerator
 import org.hibernate.engine.spi.SharedSessionContractImplementor
 import org.hibernate.id.IdentifierGenerator
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import org.springframework.boot.autoconfigure.SpringBootApplication
-import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties
-import org.springframework.boot.context.event.ApplicationReadyEvent
-import org.springframework.boot.context.properties.ConfigurationProperties
-import org.springframework.boot.context.properties.ConfigurationPropertiesScan
-import org.springframework.boot.runApplication
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Configuration
-import org.springframework.context.annotation.Primary
+import org.springframework.beans.factory.config.YamlPropertiesFactoryBean
+import org.springframework.context.event.ContextRefreshedEvent
 import org.springframework.context.event.EventListener
+import org.springframework.core.io.ClassPathResource
 import org.springframework.data.repository.CrudRepository
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.context.support.AnnotationConfigWebApplicationContext
+import org.springframework.web.servlet.DispatcherServlet
+import java.io.File
 import java.io.Serializable
 import java.math.BigDecimal
 import java.sql.Connection
@@ -36,52 +32,66 @@ import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.util.LinkedList
 import java.util.Locale
+import java.util.Properties
 import java.util.Queue
-import javax.sql.DataSource
 
 fun main(args: Array<String>) {
-    runApplication<SpringKotlinApplication>(*args)
+    val yaml = YamlPropertiesFactoryBean()
+    yaml.setResources(ClassPathResource("application.yml"))
+    val properties: Properties? = yaml.getObject()
+    val portStr: String = properties?.getProperty("server.port") ?: "8083"
+    val port: Int = resolvePort(portStr)
+    
+    val tomcat = Tomcat()
+    tomcat.setPort(port)
+    tomcat.connector.setProperty("relaxedPathChars", "<>[\\]^`{|} ")
+    tomcat.connector.setProperty("relaxedQueryChars", "<>[\\]^`{|} ")
+    
+    val baseDir: File = File(System.getProperty("java.io.tmpdir"), "tomcat-tmp-$port").apply {
+        if (!exists()) mkdirs()
+    }
+    tomcat.setBaseDir(baseDir.absolutePath)
+    
+    val context: Context = tomcat.addContext("", baseDir.absolutePath)
+    
+    val ac = AnnotationConfigWebApplicationContext()
+    if (properties != null) {
+        ac.environment.propertySources.addLast(
+            org.springframework.core.env.PropertiesPropertySource("yamlProperties", properties)
+        )
+    }
+    ac.register(AppConfig::class.java)
+    
+    val dispatcherServlet = DispatcherServlet(ac)
+    tomcat.addServlet("", "dispatcher", dispatcherServlet)
+    context.addServletMappingDecoded("/*", "dispatcher")
+    
+    tomcat.start()
+    tomcat.server.await()
 }
 
-@Configuration
-class OracleConfiguration {
-    @Primary
-    @ConfigurationProperties(prefix = "spring.datasource")
-    class DataSourceConfigs: DataSourceProperties() {
-        lateinit var ddl: String
-        lateinit var ucp: PoolDataSourceImpl
+private fun resolvePort(portStr: String): Int {
+    if (portStr.startsWith("\${") && portStr.endsWith("}")) {
+        val inner = portStr.substring(2, portStr.length - 1)
+        val parts = inner.split(":")
+        val envVar = parts[0]
+        val defaultVal = parts.getOrNull(1) ?: "8083"
+        return System.getenv(envVar)?.toIntOrNull() ?: defaultVal.toInt()
     }
-
-    @Bean
-    fun dataSource(dataSourceProperties: DataSourceConfigs): DataSource =
-        PoolDataSourceFactory.getPoolDataSource()
-            .also {dataSource: PoolDataSource ->
-                dataSource.url = dataSourceProperties.url
-                dataSource.user = dataSourceProperties.username
-                dataSource.password = dataSourceProperties.password
-                // UCP-specific configurations
-                dataSource.connectionFactoryClassName = dataSourceProperties.ucp.connectionFactoryClassName
-                dataSource.initialPoolSize = dataSourceProperties.ucp.initialPoolSize
-                dataSource.minPoolSize = dataSourceProperties.ucp.minPoolSize
-                dataSource.maxPoolSize = dataSourceProperties.ucp.maxPoolSize
-                dataSource.timeoutCheckInterval = dataSourceProperties.ucp.timeoutCheckInterval
-                dataSource.inactiveConnectionTimeout = dataSourceProperties.ucp.inactiveConnectionTimeout
-                dataSource.sqlForValidateConnection = dataSourceProperties.ucp.sqlForValidateConnection
-                dataSource.validateConnectionOnBorrow = dataSourceProperties.ucp.validateConnectionOnBorrow
-                dataSource.secondsToTrustIdleConnection = dataSourceProperties.ucp.secondsToTrustIdleConnection
-            }
+    return portStr.toIntOrNull() ?: 8083
 }
 
 @RestController
 @RequestMapping(value = ["/v1"])
-@ConfigurationPropertiesScan
-@SpringBootApplication
 class SpringKotlinApplication(
     private val userRepository: UserRepository,
     private val roleRepository: RoleRepository,
 ) {
-    @EventListener(value = [ApplicationReadyEvent::class])
-    fun applicationReadyEvent() {
+    @EventListener(value = [ContextRefreshedEvent::class])
+    fun applicationReadyEvent(event: ContextRefreshedEvent) {
+        if (event.applicationContext.parent != null) {
+            return
+        }
         var current = 1
         val total = 12
         val chunkSize = 5 // choose per-run chunking
