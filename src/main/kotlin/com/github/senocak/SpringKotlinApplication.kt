@@ -137,8 +137,8 @@ class Role(
     @Id
     @Column(name = "id", updatable = false, nullable = false)
     //@IdGeneratorType(value = DynamicSequenceGenerator::class)
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "SEQ_USER_GENERATOR")
-    @SequenceGenerator(name = "SEQ_USER_GENERATOR", sequenceName = "users_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "SEQ_ROLE_GENERATOR")
+    @SequenceGenerator(name = "SEQ_ROLE_GENERATOR", sequenceName = "roles_seq", allocationSize = 1)
     var id: Long? = null
 }
 interface RoleRepository: CrudRepository<Role, Long>
